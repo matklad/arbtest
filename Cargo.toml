@@ -1,0 +1,20 @@
+[package]
+name = "arbtest"
+version = "0.1.2"
+description = "A minimalist property-based testing library based on arbitrary"
+categories = ["development-tools::testing"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/matklad/arbtest"
+authors = ["Aleksey Kladov <aleksey.kladov@gmail.com>"]
+edition = "2021"
+
+exclude = [".github/", "bors.toml", "rustfmt.toml"]
+
+[workspace]
+members = ["xtask"]
+
+[dependencies]
+arbitrary = "1.1.0"
+
+[features]
+derive = ["arbitrary/derive"]
