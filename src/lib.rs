@@ -68,7 +68,7 @@ use arbitrary::Unstructured;
 
 pub use arbitrary;
 
-pub type Property = fn(u: &mut Unstructured<'_>) -> arbitrary::Result<()>;
+pub type Property<'a> = &'a mut dyn FnMut(&mut Unstructured<'_>) -> arbitrary::Result<()>;
 
 pub fn builder() -> Builder {
     let env_budget = env_budget();
@@ -98,27 +98,39 @@ impl Builder {
         self.min_size = size;
         self
     }
+
     pub fn max_size(mut self, size: u32) -> Builder {
         self.max_size = size;
         self
     }
+
     pub fn budget(mut self, value: Duration) -> Builder {
         self.budget = Some(value);
         self
     }
+
     pub fn budget_ms(self, value: u64) -> Builder {
         self.budget(Duration::from_millis(value))
     }
+
     pub fn seed(mut self, seed: u64) -> Builder {
         self.seed = Some(Seed::new(seed));
         self
     }
+
     pub fn minimize(mut self) -> Builder {
         self.minimize = true;
         self
     }
 
-    pub fn run(mut self, prop: Property) {
+    pub fn run<P>(self, mut prop: P)
+    where
+        P: FnMut(&mut arbitrary::Unstructured<'_>) -> arbitrary::Result<()>,
+    {
+        self.run_impl(&mut prop)
+    }
+
+    fn run_impl(mut self, prop: Property<'_>) {
         if let Some(seed) = self.seed {
             if self.minimize {
                 self.do_minimize(seed, prop)
@@ -146,12 +158,12 @@ impl Builder {
         }
     }
 
-    fn reproduce(&mut self, seed: Seed, prop: Property) {
+    fn reproduce(&mut self, seed: Seed, prop: Property<'_>) {
         let g = Guard::new(seed);
         self.single_run(seed, prop);
         g.defuse()
     }
-    fn do_minimize(&mut self, seed: Seed, prop: Property) {
+    fn do_minimize(&mut self, seed: Seed, prop: Property<'_>) {
         std::panic::set_hook(Box::new(|_| ()));
         if !self.fails(seed, prop) {
             panic!("seed {seed} did not fail")
@@ -195,16 +207,17 @@ impl Builder {
         self.budget.or(self.env_budget).unwrap_or(default)
     }
 
-    fn single_run(&mut self, seed: Seed, prop: Property) {
+    fn single_run(&mut self, seed: Seed, prop: Property<'_>) {
         seed.fill(&mut self.buf);
         let mut u = Unstructured::new(&self.buf);
         let _ = prop(&mut u);
     }
-    fn fails(&mut self, seed: Seed, prop: Property) -> bool {
-        let this = AssertUnwindSafe(self);
+    fn fails(&mut self, seed: Seed, prop: Property<'_>) -> bool {
+        let safe = AssertUnwindSafe((self, prop));
         std::panic::catch_unwind(move || {
-            let that = this;
-            that.0.single_run(seed, prop)
+            let safe = safe;
+            let AssertUnwindSafe((this, prop)) = safe;
+            this.single_run(seed, prop)
         })
         .is_err()
     }
