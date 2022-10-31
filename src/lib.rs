@@ -64,12 +64,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-use arbitrary::Unstructured;
-
 pub use arbitrary;
 
-pub type Property<'a> = &'a mut dyn FnMut(&mut Unstructured<'_>) -> arbitrary::Result<()>;
+type Property<'a> = &'a mut dyn FnMut(&mut arbitrary::Unstructured<'_>) -> arbitrary::Result<()>;
 
+/// Main entry point, creates a builder for the test.
 pub fn builder() -> Builder {
     let env_budget = env_budget();
     Builder {
@@ -83,6 +82,11 @@ pub fn builder() -> Builder {
     }
 }
 
+/// A builder for a test.
+///
+/// This builder allows customizing various aspects of the tests, such as the
+/// initial random seed, the amount of iterations to try, or the amount of
+/// random numbers (entropy) each test gets.
 pub struct Builder {
     env_budget: Option<Duration>,
     min_size: u32,
@@ -94,35 +98,82 @@ pub struct Builder {
 }
 
 impl Builder {
+    /// Sets the lower bound on the amount of random bytes each test run gets.
+    ///
+    /// Defaults to 32.
+    ///
+    /// Each randomized test gets an [arbitrary::Unstructured] as a source of
+    /// randomness. `Unstructured` can be thought of as a *finite* pseudo random
+    /// number generator, or, alternatively, as a finite sequence of random
+    /// numbers. The intuition here is that _shorter_ sequences lead to simpler
+    /// test cases.
+    ///
+    /// The `size` parameter controls the length of the initial random sequence.
+    /// More specifically, `arbtest` will run the test function multiple times,
+    /// increasing the amount of entropy from `min_size` to `max_size`.
+    ///
     pub fn min_size(mut self, size: u32) -> Builder {
         self.min_size = size;
         self
     }
 
+    /// Sets the upper bound on the amount of random bytes each test run gets.
+    ///
+    /// Defaults to 64k.
+    ///
+    /// See [`Builder::min_size`].
     pub fn max_size(mut self, size: u32) -> Builder {
         self.max_size = size;
         self
     }
 
+    /// Sets the approximate duration for the tests.
+    ///
+    /// Defaults to 100ms, can be overridden via `ARBTEST_BUDGET_MS`
+    /// environmental variable.
+    ///
+    /// `arbtest` will re-run the test function until the time runs out.
     pub fn budget(mut self, value: Duration) -> Builder {
         self.budget = Some(value);
         self
     }
 
+    /// Sets the approximate duration for the tests, in milliseconds.
     pub fn budget_ms(self, value: u64) -> Builder {
         self.budget(Duration::from_millis(value))
     }
 
+    /// Fixes the random seed.
+    ///
+    /// Normally, `arbtest` runs the test function multiple times, picking a
+    /// fresh random seed of an increased complexity every time.
+    ///
+    /// If the `seed` is set explicitly, the `test` function is run only once.
     pub fn seed(mut self, seed: u64) -> Builder {
         self.seed = Some(Seed::new(seed));
         self
     }
 
+    /// Whether to try to minimize the seed after failure.
     pub fn minimize(mut self) -> Builder {
         self.minimize = true;
         self
     }
 
+    /// Run the test.
+    ///
+    /// This will repeatedly execute `prop` until the time budget runs out, or a
+    /// failure is found. Each subsequent run of `prop` will get a longer
+    /// sequence of random number, allowing the test to progress from simpler to
+    /// more complex test cases.
+    ///
+    /// If the failure is found, and minimization is enabled, the rest of the
+    /// budget is spend to discover a smaller seed.
+    ///
+    /// Upon failure the seed is printed.
+    ///
+    /// If the seed is passed to the `seed` method, `prop` is run only once,
+    /// with the given seed.
     pub fn run<P>(self, mut prop: P)
     where
         P: FnMut(&mut arbitrary::Unstructured<'_>) -> arbitrary::Result<()>,
@@ -163,6 +214,7 @@ impl Builder {
         self.single_run(seed, prop);
         g.defuse()
     }
+
     fn do_minimize(&mut self, seed: Seed, prop: Property<'_>) {
         std::panic::set_hook(Box::new(|_| ()));
         if !self.fails(seed, prop) {
@@ -209,9 +261,10 @@ impl Builder {
 
     fn single_run(&mut self, seed: Seed, prop: Property<'_>) {
         seed.fill(&mut self.buf);
-        let mut u = Unstructured::new(&self.buf);
+        let mut u = arbitrary::Unstructured::new(&self.buf);
         let _ = prop(&mut u);
     }
+
     fn fails(&mut self, seed: Seed, prop: Property<'_>) -> bool {
         let safe = AssertUnwindSafe((self, prop));
         std::panic::catch_unwind(move || {
@@ -229,6 +282,14 @@ fn env_budget() -> Option<Duration> {
     Some(Duration::from_millis(ms))
 }
 
+/// Random seed used to generated an `[u8]` underpinning the `Unstructured`
+/// instance we pass to user's code.
+///
+/// The seed is two `u32` mashed together. Low half defines the *length* of the
+/// sequence, while the high bits are the random seed proper.
+///
+/// The reason for this encoding is to be able to print a seed as a single
+/// copy-pastable number.
 #[derive(Clone, Copy)]
 struct Seed {
     repr: u64,
