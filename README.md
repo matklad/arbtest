@@ -1,53 +1,16 @@
 # arbtest
 
-A minimalist property-based testing library based on the `arbitrary` crate.
-
-## Maintainance Status
-
-Arbitrary.
-
-## Example
+A powerful property-based testing library with a tiny API and a small implementation.
 
 ```rust
-pub fn buggy_sort(xs: &mut [u8]) {
-    for i in 0..xs.len() {
-        for j in 0..i {
-            if xs[i] == xs[j] {
-                panic!("BUG")
-            }
-        }
-    }
-    xs.sort()
-}
+use arbtest::arbtest;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use arbtest::arbitrary::{self, Unstructured};
-
-    fn prop(u: &mut Unstructured<'_>) -> arbitrary::Result<()> {
-        let mut xs = u.arbitrary::<Vec<u8>>()?;
-        buggy_sort(&mut xs);
+#[test]
+fn all_numbers_are_even() {
+    arbtest(|u| {
+        let number: u32 = u.arbitrary()?;
+        assert!(number % 2 == 0);
         Ok(())
-    }
-
-    #[test]
-    fn test() {
-        arbtest::builder().budget_ms(50_000)
-            .run(|u| prop(u))
-    }
-
-    #[test]
-    fn reproduce() {
-        arbtest::builder().seed(0xde0ad94600000001)
-            .run(|u| prop(u))
-    }
-
-    #[test]
-    fn minimize() {
-        arbtest::builder().seed(0x2d5a75df00003e9a).minimize()
-            .run(|u| prop(u))
-    }
+    });
 }
 ```

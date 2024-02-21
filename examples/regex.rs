@@ -12,11 +12,11 @@
 //! ((b)*a)*
 //! ```
 
-use arbtest::arbitrary::{self, Unstructured};
+use arbtest::{arbitrary, arbtest};
 use regex::Regex;
 
-fn arb_regex(u: &mut Unstructured<'_>) -> arbitrary::Result<String> {
-    let choices: &[fn(&mut Unstructured<'_>) -> arbitrary::Result<String>] = &[
+fn arb_regex(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<String> {
+    let choices: &[fn(&mut arbitrary::Unstructured<'_>) -> arbitrary::Result<String>] = &[
         |_u| Ok("a".to_string()),
         |_u| Ok("b".to_string()),
         |u| arb_regex(u).map(|r| format!("({r})*")),
@@ -35,7 +35,7 @@ fn arb_regex(u: &mut Unstructured<'_>) -> arbitrary::Result<String> {
 }
 
 fn main() {
-    arbtest::builder().budget_ms(60_000).seed(0x7abcb62800000020).minimize().run(|u| {
+    arbtest(|u| {
         let r = arb_regex(u)?;
         if let Ok(regex) = Regex::new(&format!("^({r})$")) {
             if regex.is_match("abba") && !regex.is_match("baab") {
@@ -45,4 +45,7 @@ fn main() {
         }
         Ok(())
     })
+    .budget_ms(10_000)
+    .seed(0x7abcb62800000020)
+    .minimize();
 }

@@ -1,6 +1,6 @@
 [package]
 name = "arbtest"
-version = "0.2.0"
+version = "0.3.0-pre.1"
 description = "A minimalist property-based testing library based on arbitrary"
 categories = ["development-tools::testing"]
 license = "MIT OR Apache-2.0"
@@ -8,16 +8,14 @@ repository = "https://github.com/matklad/arbtest"
 authors = ["Aleksey Kladov <aleksey.kladov@gmail.com>"]
 edition = "2021"
 
-exclude = [".github/", "bors.toml", "rustfmt.toml"]
+exclude = [".github/", "rustfmt.toml"]
 
 [workspace]
 members = ["xtask"]
 
 [dependencies]
-arbitrary = "1.1.0"
-
-[features]
-derive = ["arbitrary/derive"]
+arbitrary = "1.3.0"
 
 [dev-dependencies]
-regex = { version = "1.6.0", default-features = false, features = [ "std" ] }
+arbitrary = { version = "1.3.0", features = ["derive" ] }
+regex = { version = "0.1.5", package = "regex-lite" }
