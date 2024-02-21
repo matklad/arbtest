@@ -1,6 +1,6 @@
 [package]
 name = "arbtest"
-version = "0.3.0-pre.1"
+version = "0.3.0"
 description = "A minimalist property-based testing library based on arbitrary"
 categories = ["development-tools::testing"]
 license = "MIT OR Apache-2.0"
