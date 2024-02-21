@@ -255,7 +255,7 @@ pub use arbitrary;
 
 /// Repeatedly test `property` with different random seeds.
 ///
-/// Return value is a builder object which can be used to tweak behavior.
+/// Return value is an [`ArbTest`] builder object which can be used to tweak behavior.
 pub fn arbtest<P>(property: P) -> ArbTest<P>
 where
     P: FnMut(&mut arbitrary::Unstructured<'_>) -> arbitrary::Result<()>,
@@ -369,6 +369,9 @@ impl<P> Drop for ArbTest<P>
 where
     P: FnMut(&mut arbitrary::Unstructured<'_>) -> arbitrary::Result<()>,
 {
+    /// Runs property test.
+    ///
+    /// See [`ArbTest::run`].
     fn drop(&mut self) {
         self.context().run();
     }
