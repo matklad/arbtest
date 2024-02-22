@@ -262,7 +262,7 @@ where
 {
     let options =
         Options { size_min: 32, size_max: 65_536, budget: None, seed: None, minimize: false };
-    ArbTest { property, options }
+    ArbTest { property, options, done: false }
 }
 
 /// A builder for a property-based test.
@@ -279,6 +279,7 @@ where
 {
     property: P,
     options: Options,
+    done: bool,
 }
 
 struct Options {
@@ -361,6 +362,8 @@ where
     }
 
     fn context(&mut self) -> Context<'_, '_> {
+        assert!(!self.done);
+        self.done = true;
         Context { property: &mut self.property, options: &self.options, buffer: Vec::new() }
     }
 }
@@ -373,7 +376,9 @@ where
     ///
     /// See [`ArbTest::run`].
     fn drop(&mut self) {
-        self.context().run();
+        if !self.done {
+            self.context().run();
+        }
     }
 }
 
