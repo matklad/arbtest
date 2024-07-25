@@ -314,7 +314,7 @@ where
 
     /// Sets the upper bound on the amount of random bytes each test run gets.
     ///
-    /// Defaults to 64 536.
+    /// Defaults to 65 536.
     ///
     /// See [`ArbTest::size_min`].
     pub fn size_max(mut self, size: u32) -> Self {
