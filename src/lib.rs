@@ -397,7 +397,7 @@ impl<'a, 'b> Context<'a, 'b> {
             self.options.budget.or_else(env_budget).unwrap_or(default)
         };
 
-        match (self.options.seed, self.options.minimize) {
+        match (self.options.seed.or_else(env_seed), self.options.minimize) {
             (None, false) => self.run_search(budget),
             (None, true) => panic!("can't minimize without a seed"),
             (Some(seed), false) => self.run_reproduce(seed),
@@ -506,6 +506,17 @@ fn env_budget() -> Option<Duration> {
     let var = std::env::var("ARBTEST_BUDGET_MS").ok()?;
     let ms = var.parse::<u64>().ok()?;
     Some(Duration::from_millis(ms))
+}
+
+fn env_seed() -> Option<Seed> {
+    let var = std::env::var("ARBTEST_SEED").ok()?;
+    // Check if it starts with "0x" and stip it if necessary before parsing as hex.
+    let repr = u64::from_str_radix(
+        if let Some(stripped_var) = var.strip_prefix("0x") { stripped_var } else { &var },
+        16,
+    )
+    .ok()?;
+    Some(Seed { repr })
 }
 
 /// Random seed used to generated an `[u8]` underpinning the `Unstructured`
