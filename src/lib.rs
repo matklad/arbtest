@@ -92,7 +92,7 @@
 //! ```
 //!
 //! The [`budget`](ArbTest::budget) function controls how long the search loop runs, default is one
-//! hundred milliseconds. This default can be overridden with `ARBTEST_BUDGET_MS` environmental
+//! hundred milliseconds. This default can be overridden with the `ARBTEST_BUDGET_MS` environment
 //! variable.
 //!
 //! ## Size Constraint
@@ -126,9 +126,10 @@
 //! arbtest(property).seed(0x92).minimize();
 //! ```
 //!
-//! When a [`seed`](ArbTest::seed) is specified, `arbtest` uses the seed to generate a fixed
-//! `Unstructured` and runs the property function once. This is useful to debug a test failure after
-//! a failing seed is found through search.
+//! When a [`seed`](ArbTest::seed) is specified or provided via the `ARBTEST_SEED` environment
+//! variable, `arbtest` uses the seed to generate a fixed `Unstructured` and runs the property
+//! function once. This is useful to debug a test failure after a failing seed is found through
+//! search.
 //!
 //! If in addition to `seed` [`minimize`](ArbTest::minimize) is set, then `arbtest` will try to find
 //! a smaller seed which still triggers a failure. You could use [`budget`](ArbTest::budget) to
@@ -324,7 +325,7 @@ where
 
     /// Sets the approximate duration for the tests.
     ///
-    /// Defaults to 100ms, can be overridden via `ARBTEST_BUDGET_MS` environmental variable.
+    /// Defaults to 100ms, can be overridden via the `ARBTEST_BUDGET_MS` environment variable.
     ///
     /// `arbtest` will re-run the test function until the time runs out or until it panics.
     pub fn budget(mut self, value: Duration) -> Self {
@@ -338,6 +339,8 @@ where
     }
 
     /// Fixes the random seed.
+    /// 
+    /// Can also be set explicitly via the `ARBTEST_SEED` environment variable.
     ///
     /// Normally, `arbtest` runs the test function multiple times, picking a
     /// fresh random seed of an increased complexity every time.
