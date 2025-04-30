@@ -339,7 +339,7 @@ where
     }
 
     /// Fixes the random seed.
-    /// 
+    ///
     /// Can also be set explicitly via the `ARBTEST_SEED` environment variable.
     ///
     /// Normally, `arbtest` runs the test function multiple times, picking a
@@ -488,6 +488,7 @@ impl<'a, 'b> Context<'a, 'b> {
         let size = seed.size();
         eprintln!("minimized");
         eprintln!("seed {seed}, seed size {size}, search time {:0.2?}", t.elapsed());
+        panic!("minimization failed successfully!");
     }
 
     fn try_seed(&mut self, seed: Seed) -> arbitrary::Result<()> {
