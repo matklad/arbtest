@@ -492,7 +492,7 @@ impl<'a, 'b> Context<'a, 'b> {
     }
 
     fn try_seed(&mut self, seed: Seed) -> arbitrary::Result<()> {
-        seed.fill(&mut self.buffer);
+        seed.fill(&mut self.buffer, self.options.size_max);
         let mut u = arbitrary::Unstructured::new(&self.buffer);
         (self.property)(&mut u)
     }
@@ -557,7 +557,7 @@ impl Seed {
     fn rand(self) -> u32 {
         (self.repr >> u32::BITS) as u32
     }
-    fn fill(self, buf: &mut Vec<u8>) {
+    fn fill(self, buf: &mut Vec<u8>, size_max: u32) {
         buf.clear();
         buf.reserve(self.size() as usize);
         let mut random = self.rand();
@@ -567,7 +567,7 @@ impl Seed {
             random ^= random << 5;
             random
         });
-        while buf.len() < self.size() as usize {
+        while buf.len() < self.size().min(size_max) as usize {
             buf.extend(rng.next().unwrap().to_le_bytes());
         }
     }
