@@ -248,8 +248,15 @@ use std::{
     fmt,
     hash::{BuildHasher, Hasher},
     panic::AssertUnwindSafe,
-    time::{Duration, Instant},
+    time::Duration,
 };
+
+#[cfg(target_arch = "wasm32")]
+use web_time::Instant;
+
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Instant;
+
 
 #[doc(no_inline)]
 pub use arbitrary;
@@ -456,7 +463,7 @@ impl<'a, 'b> Context<'a, 'b> {
         }
 
         let mut seed = seed;
-        let t = std::time::Instant::now();
+        let t = Instant::now();
 
         let minimizers = [|s| s / 2, |s| s * 9 / 10, |s| s - 1];
         let mut minimizer = 0;
