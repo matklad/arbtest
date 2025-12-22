@@ -266,6 +266,21 @@ where
     ArbTest { property, options, done: false }
 }
 
+thread_local! {
+    /// Whether the current test is being run in reproduce mode. See [`is_reproduce`].
+    static IS_REPRODUCE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Returns true if the current test is being run in reproduce mode.
+///
+/// This is the case when a fixed seed is being used (see [`ArbTest::seed`]), or when the running
+/// the minimized test case found (see [`ArbTest::minimize`]).
+///
+/// Is useful for enabling verbose logging only reproducing a failure test.
+pub fn is_reproduce() -> bool {
+    IS_REPRODUCE.get()
+}
+
 /// A builder for a property-based test.
 ///
 /// This builder allows customizing various aspects of the test, such as the
@@ -453,8 +468,10 @@ impl<'a, 'b> Context<'a, 'b> {
     }
 
     fn run_reproduce(&mut self, seed: Seed) {
+        IS_REPRODUCE.set(true);
         let guard = PrintSeedOnPanic::new(seed);
         self.try_seed(seed).unwrap_or_else(|error| panic!("{error}"));
+        IS_REPRODUCE.set(false);
         guard.defuse()
     }
 
