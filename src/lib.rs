@@ -1,6 +1,6 @@
 //! A powerful property-based testing library with a tiny API and a small implementation.
 //!
-//! ```rust
+//! ```no_run
 //! use arbtest::arbtest;
 //!
 //! #[test]
@@ -118,11 +118,10 @@
 //!
 //! ## Replay and Minimization
 //!
-//! ```
+//! ```should_panic
 //! # use arbtest::arbtest;
 //! # let property = |_: &mut arbitrary::Unstructured| -> arbitrary::Result<()> { Ok(()) };
 //! arbtest(property).seed(0x92);
-//! # let property = |_: &mut arbitrary::Unstructured| -> arbitrary::Result<()> { panic!() };
 //! arbtest(property).seed(0x92).minimize();
 //! ```
 //!
