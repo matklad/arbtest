@@ -501,7 +501,7 @@ impl<'a, 'b> Context<'a, 'b> {
         let size = seed.size();
         eprintln!("minimized");
         eprintln!("seed {seed}, seed size {size}, search time {:0.2?}", t.elapsed());
-        panic!("minimization failed successfully!");
+        self.run_reproduce(seed);
     }
 
     fn try_seed(&mut self, seed: Seed) -> arbitrary::Result<()> {
