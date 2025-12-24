@@ -1,6 +1,6 @@
 //! A powerful property-based testing library with a tiny API and a small implementation.
 //!
-//! ```rust
+//! ```no_run
 //! use arbtest::arbtest;
 //!
 //! #[test]
@@ -118,11 +118,10 @@
 //!
 //! ## Replay and Minimization
 //!
-//! ```
+//! ```should_panic
 //! # use arbtest::arbtest;
 //! # let property = |_: &mut arbitrary::Unstructured| -> arbitrary::Result<()> { Ok(()) };
 //! arbtest(property).seed(0x92);
-//! # let property = |_: &mut arbitrary::Unstructured| -> arbitrary::Result<()> { panic!() };
 //! arbtest(property).seed(0x92).minimize();
 //! ```
 //!
@@ -131,9 +130,10 @@
 //! function once. This is useful to debug a test failure after a failing seed is found through
 //! search.
 //!
-//! If in addition to `seed` [`minimize`](ArbTest::minimize) is set, then `arbtest` will try to find
-//! a smaller seed which still triggers a failure. You could use [`budget`](ArbTest::budget) to
-//! control how long the minimization runs.
+//! If in addition to `seed` [`minimize`](ArbTest::minimize) is set, then `arbtest` will try to
+//! find a smaller seed which still triggers a failure. You can use `ARBTEST_MINIMIZE` to both set
+//! a seed and enable minimization. You could use [`budget`](ArbTest::budget) to control how long
+//! the minimization runs.
 //!
 //! ## When the Code Gets Run
 //!
@@ -266,6 +266,21 @@ where
     ArbTest { property, options, done: false }
 }
 
+thread_local! {
+    /// Whether the current test is being run in reproduce mode. See [`is_reproduce`].
+    static IS_REPRODUCE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Returns true if the current test is being run in reproduce mode.
+///
+/// This is the case when a fixed seed is being used (see [`ArbTest::seed`]), or when the running
+/// the minimized test case found (see [`ArbTest::minimize`]).
+///
+/// Is useful for enabling verbose logging only reproducing a failure test.
+pub fn is_reproduce() -> bool {
+    IS_REPRODUCE.get()
+}
+
 /// A builder for a property-based test.
 ///
 /// This builder allows customizing various aspects of the test, such as the
@@ -334,13 +349,17 @@ where
     }
 
     /// Sets the approximate duration for the tests, in milliseconds.
+    ///
+    /// See [`ArbTest::budget`] for more info.
     pub fn budget_ms(self, value: u64) -> Self {
         self.budget(Duration::from_millis(value))
     }
 
     /// Fixes the random seed.
     ///
-    /// Can also be set explicitly via the `ARBTEST_SEED` environment variable.
+    /// Can also be set explicitly via the `ARBTEST_SEED` environment variable. Or via the
+    /// `ARBTEST_MINIMIZE` environment variable, which also enables minimization (see
+    /// [`ArbTest::minimize`]).
     ///
     /// Normally, `arbtest` runs the test function multiple times, picking a
     /// fresh random seed of an increased complexity every time.
@@ -352,6 +371,12 @@ where
     }
 
     /// Whether to try to minimize the seed after failure.
+    ///
+    /// Only has effect if a fixed seed is set (see [`ArbTest::seed`]).
+    ///
+    /// Can also be set via the `ARBTEST_MINIMIZE` environment variable. A value of `0` disables
+    /// minimization, any other value enables it. `ARBTEST_MINIMIZE` can also be set to a seed
+    /// value with the prefixed with `0x` to both fix the seed and enable minimization.
     pub fn minimize(mut self) -> Self {
         self.options.minimize = true;
         self
@@ -400,7 +425,9 @@ impl<'a, 'b> Context<'a, 'b> {
             self.options.budget.or_else(env_budget).unwrap_or(default)
         };
 
-        match (self.options.seed.or_else(env_seed), self.options.minimize) {
+        let seed = self.options.seed.or_else(env_seed);
+        let minimize = env_minimize().unwrap_or(self.options.minimize);
+        match (seed, minimize) {
             (None, false) => self.run_search(budget),
             (None, true) => panic!("can't minimize without a seed"),
             (Some(seed), false) => self.run_reproduce(seed),
@@ -441,8 +468,10 @@ impl<'a, 'b> Context<'a, 'b> {
     }
 
     fn run_reproduce(&mut self, seed: Seed) {
+        IS_REPRODUCE.set(true);
         let guard = PrintSeedOnPanic::new(seed);
         self.try_seed(seed).unwrap_or_else(|error| panic!("{error}"));
+        IS_REPRODUCE.set(false);
         guard.defuse()
     }
 
@@ -488,7 +517,7 @@ impl<'a, 'b> Context<'a, 'b> {
         let size = seed.size();
         eprintln!("minimized");
         eprintln!("seed {seed}, seed size {size}, search time {:0.2?}", t.elapsed());
-        panic!("minimization failed successfully!");
+        self.run_reproduce(seed);
     }
 
     fn try_seed(&mut self, seed: Seed) -> arbitrary::Result<()> {
@@ -513,14 +542,31 @@ fn env_budget() -> Option<Duration> {
 }
 
 fn env_seed() -> Option<Seed> {
-    let var = std::env::var("ARBTEST_SEED").ok()?;
+    let string;
+    let var = match std::env::var("ARBTEST_SEED").ok() {
+        Some(var) => {
+            string = var;
+            string.strip_prefix("0x").unwrap_or(&string)
+        }
+        _ => match std::env::var("ARBTEST_MINIMIZE").ok() {
+            Some(var) => {
+                // Only accept hex to not conflict with ARBTEST_MINIMIZE=0
+                string = var;
+                string.strip_prefix("0x")?
+            }
+            _ => return None,
+        },
+    };
     // Check if it starts with "0x" and stip it if necessary before parsing as hex.
-    let repr = u64::from_str_radix(
-        if let Some(stripped_var) = var.strip_prefix("0x") { stripped_var } else { &var },
-        16,
-    )
-    .ok()?;
+    let repr = u64::from_str_radix(var, 16).ok()?;
     Some(Seed { repr })
+}
+
+fn env_minimize() -> Option<bool> {
+    let Ok(x) = std::env::var("ARBTEST_MINIMIZE") else {
+        return None;
+    };
+    Some(!matches!(x.as_str(), "0" | "false" | "no" | "off"))
 }
 
 /// Random seed used to generated an `[u8]` underpinning the `Unstructured`
